@@ -36,7 +36,7 @@ pico_sdk_init()
 # Add executable. Default name is the project name, version 0.1
 
 add_executable(${PROJECT_NAME}
-        ssd1306_i2c.c
+        main.c
         )
 add_subdirectory(pico-ssd1306)
 
