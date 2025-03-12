@@ -1,13 +1,15 @@
 #include "pico/bootrom.h"
 #include "pico/stdlib.h"
 
+#include "pico-ssd1306/shapeRenderer/ShapeRenderer.h"
 #include "pico-ssd1306/ssd1306.h"
 #include "pico-ssd1306/textRenderer/TextRenderer.h"
-#include "pico-ssd1306/shapeRenderer/ShapeRenderer.h"
 
 #include "hardware/i2c.h"
 
 #include <array>
+#include <atomic>
+#include <format>
 
 // Use the namespace for convenience
 using namespace pico_ssd1306;
@@ -20,8 +22,58 @@ void blink()
     sleep_ms(500);
 }
 
+#define ENCODER_SWITCH 2
+#define ENCODER_CLK 4 // Pin for A (CLK)
+#define ENCODER_DT 3 // Pin for B (DT)
+
+std::atomic<int> encoder_count = 0; // Counter for the encoder position
+std::atomic<bool> button_pressed = false;
+
+/* encoder routines */
+uint8_t enc_state(void)
+{
+    static uint8_t prev_state = 0;
+
+    uint8_t new_state = gpio_get(ENCODER_DT) + (2 * gpio_get(ENCODER_CLK));
+    return new_state;
+}
+
+void encoder_callback(uint gpio, uint32_t events)
+{
+    if (gpio == ENCODER_SWITCH)
+    {
+        button_pressed = true;
+    }
+    else if (gpio == ENCODER_CLK || gpio == ENCODER_DT)
+    {
+        static uint8_t saved_enc = 0;
+        uint8_t enc_now, enc_prev;
+
+        enc_now = enc_state();
+        if (enc_now == saved_enc)
+        {
+            return;
+        }
+
+        // swap the state before we return
+        enc_prev = saved_enc;
+        saved_enc = enc_now;
+
+        if ((enc_prev == 2 && enc_now == 3) || (enc_prev == 3 && enc_now == 1) || (enc_prev == 1 && enc_now == 0) || (enc_prev == 0 && enc_now == 2))
+        {
+            encoder_count++;
+        }
+        if ((enc_prev == 3 && enc_now == 2) || (enc_prev == 2 && enc_now == 0) || (enc_prev == 0 && enc_now == 1) || (enc_prev == 1 && enc_now == 3))
+        {
+            encoder_count--;
+        }
+    }
+}
+
 int main()
 {
+    stdio_init_all();
+
     // Init i2c0 controller
     i2c_init(i2c0, 1000000);
     // Set up pins 12 and 13
@@ -29,6 +81,23 @@ int main()
     gpio_set_function(1, GPIO_FUNC_I2C);
     gpio_pull_up(0);
     gpio_pull_up(1);
+
+    // Rotary encoder
+    gpio_set_function(ENCODER_SWITCH, GPIO_FUNC_SIO);
+    gpio_set_function(ENCODER_CLK, GPIO_FUNC_SIO);
+    gpio_set_function(ENCODER_DT, GPIO_FUNC_SIO);
+
+    gpio_set_dir(ENCODER_CLK, GPIO_IN);
+    gpio_set_dir(ENCODER_DT, GPIO_IN);
+    gpio_set_dir(ENCODER_SWITCH, GPIO_IN);
+
+    gpio_pull_up(ENCODER_CLK);
+    gpio_pull_up(ENCODER_DT);
+    gpio_pull_up(ENCODER_SWITCH);
+    
+    gpio_set_irq_enabled_with_callback(ENCODER_DT, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &encoder_callback);
+    gpio_set_irq_enabled(ENCODER_CLK, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true);
+    gpio_set_irq_enabled(ENCODER_SWITCH, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true);
 
     // LED
     gpio_init(PICO_DEFAULT_LED_PIN);
@@ -52,27 +121,62 @@ int main()
     // Last we tell this function where to anchor the text
     // Anchor means top left of what we draw
 
-    std::array<int, 2> rows = {0, 34};
+    std::array<int, 2> rows = { 0, 34 };
 
-    drawText(&display, font_12x16, "40 Meter", 0, 0);
-    drawText(&display, font_12x16, "7.000000Mhz", 0, rows[1]);
+    uint64_t value = 7000000;
+    uint32_t currentDigit = 6;
 
-    // Underline 
-    const uint32_t fontHeight = 16;
-    const uint32_t fontWidth = 12;
-    uint32_t currentDigit = 7;
-    uint32_t pad = 1;
-    fillRect(&display, (currentDigit * fontWidth) + pad, rows[1] + fontHeight, ((currentDigit + 1) * fontWidth), rows[1] + fontHeight + 2);
+    auto drawDisplay = [&] {
+        display.clear();
+        drawText(&display, font_12x16, "40 Meter", 0, 0);
 
-    // Send buffer to the display
-    display.sendBuffer();
+        auto str = std::to_string(value) + "Mhz";
+        drawText(&display, font_12x16, str.c_str(), 0, rows[1]);
 
-    blink();
+        // Underline
+        const uint32_t fontHeight = 16;
+        const uint32_t fontWidth = 12;
+        uint32_t pad = 1;
+        fillRect(&display, (currentDigit * fontWidth) + pad, rows[1] + fontHeight, ((currentDigit + 1) * fontWidth), rows[1] + fontHeight + 2);
 
-    sleep_ms(1000);
+        // Send buffer to the display
+        display.sendBuffer();
+    };
+    drawDisplay();
+
+    while (true)
+    {
+        bool update = false;
+        if (abs(encoder_count) > 1)
+        {
+            printf("EncoderCount: %d\n", encoder_count.load());
+            printf("currentDigit: %d\n\n", currentDigit);
+            value += ((encoder_count / 2) * pow(10, (6 - currentDigit)));
+            encoder_count = 0;
+            update = true;
+            value = std::clamp(value, 7000000ull, 7200000ull);
+        }
+
+        if (button_pressed)
+        {
+            currentDigit++;
+            if (currentDigit > 6)
+            {
+                currentDigit = 1;
+            }
+            button_pressed = false;
+        }
+       
+        if (update)
+        {
+            drawDisplay();
+        }
+    }
 
     reset_usb_boot(0, 0);
 
     while (true)
+    {
         tight_loop_contents();
+    }
 }
