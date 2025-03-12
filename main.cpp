@@ -38,11 +38,20 @@ uint8_t enc_state(void)
     return new_state;
 }
 
+long long int handle_switch(long int a, void* p)
+{
+    if (gpio_get(ENCODER_SWITCH) == 1)
+    {
+        button_pressed = true;
+    }
+    return 0;
+}
+
 void encoder_callback(uint gpio, uint32_t events)
 {
     if (gpio == ENCODER_SWITCH)
     {
-        button_pressed = true;
+        add_alarm_in_ms(10, handle_switch, nullptr, true);
     }
     else if (gpio == ENCODER_CLK || gpio == ENCODER_DT)
     {
@@ -94,7 +103,7 @@ int main()
     gpio_pull_up(ENCODER_CLK);
     gpio_pull_up(ENCODER_DT);
     gpio_pull_up(ENCODER_SWITCH);
-    
+
     gpio_set_irq_enabled_with_callback(ENCODER_DT, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &encoder_callback);
     gpio_set_irq_enabled(ENCODER_CLK, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true);
     gpio_set_irq_enabled(ENCODER_SWITCH, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true);
@@ -165,8 +174,9 @@ int main()
                 currentDigit = 1;
             }
             button_pressed = false;
+            update = true;
         }
-       
+
         if (update)
         {
             drawDisplay();
