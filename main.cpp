@@ -1,31 +1,27 @@
+#include "pico/bootrom.h"
 #include "pico/stdlib.h"
+
 #include "pico-ssd1306/ssd1306.h"
 #include "pico-ssd1306/textRenderer/TextRenderer.h"
+#include "pico-ssd1306/shapeRenderer/ShapeRenderer.h"
+
 #include "hardware/i2c.h"
-#include "hardware/watchdog.h"
-#include "hardware/structs/rosc.h"
-#include "hardware/structs/syscfg.h"
+
+#include <array>
 
 // Use the namespace for convenience
 using namespace pico_ssd1306;
 
-const uint32_t LED_PIN = 25;
-
 void blink()
 {
-    gpio_put(LED_PIN, 1);
+    gpio_put(PICO_DEFAULT_LED_PIN, 1);
     sleep_ms(500);
-    gpio_put(LED_PIN, 0);
+    gpio_put(PICO_DEFAULT_LED_PIN, 0);
     sleep_ms(500);
 }
 
-void reset_to_bootsel() {
-    watchdog_reboot(0, 0, 0);
-    rosc_hw->ctrl = 0;
-    while (true);
-}
-
-int main(){
+int main()
+{
     // Init i2c0 controller
     i2c_init(i2c0, 1000000);
     // Set up pins 12 and 13
@@ -33,6 +29,10 @@ int main(){
     gpio_set_function(1, GPIO_FUNC_I2C);
     gpio_pull_up(0);
     gpio_pull_up(1);
+
+    // LED
+    gpio_init(PICO_DEFAULT_LED_PIN);
+    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
 
     // If you don't do anything before initializing a display pi pico is too fast and starts sending
     // commands before the screen controller had time to set itself up, so we add an artificial delay for
@@ -51,14 +51,28 @@ int main(){
     // Available fonts are listed in textRenderer's readme
     // Last we tell this function where to anchor the text
     // Anchor means top left of what we draw
-    //drawText(&display, font_12x16, "TEST text", 0 ,0);
+
+    std::array<int, 2> rows = {0, 34};
+
+    drawText(&display, font_12x16, "40 Meter", 0, 0);
+    drawText(&display, font_12x16, "7.000000Mhz", 0, rows[1]);
+
+    // Underline 
+    const uint32_t fontHeight = 16;
+    const uint32_t fontWidth = 12;
+    uint32_t currentDigit = 7;
+    uint32_t pad = 1;
+    fillRect(&display, (currentDigit * fontWidth) + pad, rows[1] + fontHeight, ((currentDigit + 1) * fontWidth), rows[1] + fontHeight + 2);
 
     // Send buffer to the display
-    //display.sendBuffer();
+    display.sendBuffer();
 
     blink();
 
-    reset_to_bootsel();
+    sleep_ms(1000);
 
-    return 0;
+    reset_usb_boot(0, 0);
+
+    while (true)
+        tight_loop_contents();
 }
