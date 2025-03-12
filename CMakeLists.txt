@@ -35,15 +35,25 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
+add_subdirectory(external/pico-ssd1306)
+
 add_executable(${PROJECT_NAME}
-        main.c
+        main.cpp
         )
-add_subdirectory(pico-ssd1306)
 
 # pull in common dependencies and additional i2c hardware support
-target_link_libraries(${PROJECT_NAME} pico-ssd1306 pico_stdlib hardware_i2c)
+target_link_libraries(${PROJECT_NAME} pico_ssd1306 pico_stdlib hardware_i2c)
+
+target_include_directories(${PROJECT_NAME}
+ PUBLIC 
+    external
+    external/pico-ssd1306/include)
 
 # create map/bin/hex file etc.
 pico_add_extra_outputs(${PROJECT_NAME})
 
 # add url via pico_set_program_url
+pico_enable_stdio_usb(${PROJECT_NAME} 1)
+pico_enable_stdio_uart(${PROJECT_NAME} 0)
+
+pico_add_extra_outputs(${PROJECT_NAME})
