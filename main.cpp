@@ -28,6 +28,7 @@ void blink()
 
 std::atomic<int> encoder_count = 0; // Counter for the encoder position
 std::atomic<bool> button_pressed = false;
+std::atomic<bool> button_state = false;
 
 /* encoder routines */
 uint8_t enc_state(void)
@@ -40,9 +41,15 @@ uint8_t enc_state(void)
 
 long long int handle_switch(long int a, void* p)
 {
-    if (gpio_get(ENCODER_SWITCH) == 1)
+    if (gpio_get(ENCODER_SWITCH) == 1 && button_state == false)
     {
+        // Trigger button press
         button_pressed = true;
+        button_state = true;
+    }
+    else if (gpio_get(ENCODER_SWITCH) == 0 && button_state == true)
+    {
+        button_state = 0;
     }
     return 0;
 }
@@ -51,7 +58,7 @@ void encoder_callback(uint gpio, uint32_t events)
 {
     if (gpio == ENCODER_SWITCH)
     {
-        add_alarm_in_ms(10, handle_switch, nullptr, true);
+        add_alarm_in_ms(50, handle_switch, nullptr, true);
     }
     else if (gpio == ENCODER_CLK || gpio == ENCODER_DT)
     {
