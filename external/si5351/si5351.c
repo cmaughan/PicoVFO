@@ -53,8 +53,8 @@ uint8_t i2c_bus_addr;
 bool clk_first_set[8];
 
 /* I2C0 pins */
-#define I2C0_SDA 3
-#define I2C0_SCL 4
+#define I2C0_SDA 0
+#define I2C0_SCL 1
 
 /********************/
 /* Public functions */
@@ -85,11 +85,11 @@ bool si5351_init(uint8_t i2c_addr, uint8_t xtal_load_c, uint32_t xo_freq, int32_
 	pllb_ref_osc = SI5351_PLL_INPUT_XO;
 	clkin_div = SI5351_CLKIN_DIV_1;
 
-	i2c_init(i2c0, 400*1000);
-	gpio_set_function(I2C0_SDA, GPIO_FUNC_I2C);
-	gpio_set_function(I2C0_SCL, GPIO_FUNC_I2C);
-	gpio_pull_up(I2C0_SDA);
-	gpio_pull_up(I2C0_SCL);
+	//i2c_init(i2c0, 400*1000);
+	//gpio_set_function(I2C0_SDA, GPIO_FUNC_I2C);
+	//gpio_set_function(I2C0_SCL, GPIO_FUNC_I2C);
+	//gpio_pull_up(I2C0_SDA);
+	//gpio_pull_up(I2C0_SCL);
 
 	// Check for a device on the bus, bail out if it is not there
 	uint8_t reg_val = 0;

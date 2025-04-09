@@ -1,13 +1,17 @@
 #include "pico/bootrom.h"
 #include "pico/stdlib.h"
 
+// Display Library
 #include "pico-ssd1306/shapeRenderer/ShapeRenderer.h"
 #include "pico-ssd1306/ssd1306.h"
 #include "pico-ssd1306/textRenderer/TextRenderer.h"
 
 #include "hardware/i2c.h"
 
+// 5351 Frequency Synthesizer library
+extern "C" {
 #include "si5351/si5351.h"
+}
 
 #include <array>
 #include <atomic>
@@ -16,6 +20,7 @@
 // Use the namespace for convenience
 using namespace pico_ssd1306;
 
+// Utility function to blind the light for debugging
 void blink()
 {
     gpio_put(PICO_DEFAULT_LED_PIN, 1);
@@ -24,15 +29,17 @@ void blink()
     sleep_ms(500);
 }
 
+// Rotary encoder connections
 #define ENCODER_SWITCH 2
 #define ENCODER_CLK 4 // Pin for A (CLK)
 #define ENCODER_DT 3 // Pin for B (DT)
+#define ENCODER_ADDRESS 0x3C // The encoder's address on the I2C Bus
 
 std::atomic<int> encoder_count = 0; // Counter for the encoder position
 std::atomic<bool> button_pressed = false;
 std::atomic<bool> button_state = false;
 
-/* encoder routines */
+// Get the encoder state
 uint8_t enc_state(void)
 {
     static uint8_t prev_state = 0;
@@ -41,6 +48,7 @@ uint8_t enc_state(void)
     return new_state;
 }
 
+// Handle the encoder switch
 long long int handle_switch(long int a, void* p)
 {
     if (gpio_get(ENCODER_SWITCH) == 1 && button_state == false)
@@ -56,14 +64,17 @@ long long int handle_switch(long int a, void* p)
     return 0;
 }
 
+// Handle the encoder
 void encoder_callback(uint gpio, uint32_t events)
 {
     if (gpio == ENCODER_SWITCH)
     {
+        // Debounce the switch
         add_alarm_in_ms(50, handle_switch, nullptr, true);
     }
     else if (gpio == ENCODER_CLK || gpio == ENCODER_DT)
     {
+        // Track the pulses on the encoder and turn into a sensible rotary count.
         static uint8_t saved_enc = 0;
         uint8_t enc_now, enc_prev;
 
@@ -94,7 +105,8 @@ int main()
 
     // Init i2c0 controller
     i2c_init(i2c0, 1000000);
-    // Set up pins 12 and 13
+
+    // Set up pins 0 and 1 for I2C, pull both up internally
     gpio_set_function(0, GPIO_FUNC_I2C);
     gpio_set_function(1, GPIO_FUNC_I2C);
     gpio_pull_up(0);
@@ -126,8 +138,25 @@ int main()
     // ssd1306 to set itself up
     sleep_ms(250);
 
-    // Create a new display object at address 0x3D and size of 128x64
-    SSD1306 display = SSD1306(i2c0, 0x3C, Size::W128xH64);
+    // Initialize the Si5351; 7Mhz
+    // Calibration to be done later; this is roughly correct
+    si5351_init(0x60, SI5351_CRYSTAL_LOAD_8PF, 25000000, -40000); // I am using a 25 MHz TCXO
+
+    // Just clock 0 for now
+    si5351_set_clock_pwr(SI5351_CLK0, 1); // safety first
+    si5351_set_clock_pwr(SI5351_CLK1, 0); // safety first
+    si5351_set_clock_pwr(SI5351_CLK2, 0); // safety first
+
+    si5351_drive_strength(SI5351_CLK0, SI5351_DRIVE_8MA);
+
+    // Start at the base of 40m band
+    si5351_set_freq(7000000ULL * 100ULL, SI5351_CLK0);
+    si5351_output_enable(SI5351_CLK0, 1);
+    si5351_output_enable(SI5351_CLK1, 0);
+    si5351_output_enable(SI5351_CLK2, 0);
+
+    // Create a new display object at address 0x3C and size of 128x64
+    SSD1306 display = SSD1306(i2c0, ENCODER_ADDRESS, Size::W128xH64);
 
     // Here we rotate the display by 180 degrees, so that it's not upside down from my perspective
     // If your screen is upside down try setting it to 1 or 0
@@ -138,33 +167,21 @@ int main()
     // Available fonts are listed in textRenderer's readme
     // Last we tell this function where to anchor the text
     // Anchor means top left of what we draw
-
     std::array<int, 2> rows = { 0, 34 };
-
-    // Initialize the Si5351; 7Mhz
-    si5351_init(0x60, SI5351_CRYSTAL_LOAD_8PF, 25000000, 0); // I am using a 25 MHz TCXO
-    si5351_set_clock_pwr(SI5351_CLK0, 0); // safety first
-
-    si5351_drive_strength(SI5351_CLK1, SI5351_DRIVE_8MA);
-    si5351_drive_strength(SI5351_CLK2, SI5351_DRIVE_8MA);
-
-    si5351_set_freq(7074000ULL * 100ULL, SI5351_CLK0);
-    si5351_output_enable(SI5351_CLK0, 1);
-    si5351_output_enable(SI5351_CLK1, 0);
-    si5351_output_enable(SI5351_CLK2, 0);
-
 
     uint64_t value = 7000000;
     uint32_t currentDigit = 6;
 
     auto drawDisplay = [&] {
+        // Name of band
         display.clear();
         drawText(&display, font_12x16, "40 Meter", 0, 0);
 
+        // Frequency
         auto str = std::to_string(value) + "Mhz";
         drawText(&display, font_12x16, str.c_str(), 0, rows[1]);
 
-        // Underline
+        // Underline for the current counter digit to change
         const uint32_t fontHeight = 16;
         const uint32_t fontWidth = 12;
         uint32_t pad = 1;
@@ -177,17 +194,22 @@ int main()
 
     while (true)
     {
-        bool update = false;
-        if (abs(encoder_count) > 1)
+        // When the encoder ticks, advance
+        bool update_clock = false;
+        bool update_display = false;
+
+        if (abs(encoder_count) > 2)
         {
-            printf("EncoderCount: %d\n", encoder_count.load());
-            printf("currentDigit: %d\n\n", currentDigit);
-            value += ((encoder_count / 2) * pow(10, (6 - currentDigit)));
+            auto count = encoder_count / 2;
+            value += (count * pow(10, (6 - currentDigit)));
             encoder_count = 0;
-            update = true;
+            update_clock = true;
+            update_display = true;
+
             value = std::clamp(value, 7000000ull, 7200000ull);
         }
 
+        // Encoder button pressed, choose the next unit to change
         if (button_pressed)
         {
             currentDigit++;
@@ -196,13 +218,23 @@ int main()
                 currentDigit = 1;
             }
             button_pressed = false;
-            update = true;
+            update_display = true;
         }
 
-        if (update)
+        // Update the clock
+        if (update_clock)
+        {
+            si5351_set_freq(value * 100ULL, SI5351_CLK0);
+        }
+
+        // Update the display
+        if (update_display)
         {
             drawDisplay();
         }
+
+        // Back off, just a bit
+        sleep_ms(1);
     }
 
     reset_usb_boot(0, 0);
