@@ -27,8 +27,10 @@ set(PICO_BOARD pimoroni_badger2040 CACHE STRING "Board type")
 
 # Pull in Raspberry Pi Pico SDK (must be before project)
 include(pico_sdk_import.cmake)
+include(pimoroni_pico_import.cmake)
+#include(external/pimoroni/pimoroni_pico_import.cmake)
 
-add_subdirectory(external/pimoroni)
+#add_subdirectory(external/pimoroni)
 
 project(VFO C CXX ASM)
 
@@ -50,7 +52,7 @@ target_link_libraries(${PROJECT_NAME} pico_ssd1306 pico_stdlib hardware_i2c badg
 target_include_directories(${PROJECT_NAME}
  PUBLIC 
     external
-    external/pimoroni
+    #external/pimoroni
     external/pico-ssd1306/include
     external/si5351)
 

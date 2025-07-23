@@ -8,7 +8,7 @@
 
 #include "hardware/i2c.h"
 
-#include <badger2040/badger2040.hpp>
+//##include <badger2040.hpp>
 
 // 5351 Frequency Synthesizer library
 extern "C" {
