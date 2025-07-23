@@ -23,10 +23,12 @@ if (EXISTS ${picoVscode})
     include(${picoVscode})
 endif()
 # ====================================================================================
-set(PICO_BOARD pimoroni_tiny2350 CACHE STRING "Board type")
+set(PICO_BOARD pimoroni_badger2040 CACHE STRING "Board type")
 
 # Pull in Raspberry Pi Pico SDK (must be before project)
 include(pico_sdk_import.cmake)
+
+add_subdirectory(external/pimoroni)
 
 project(VFO C CXX ASM)
 
@@ -43,11 +45,12 @@ add_executable(${PROJECT_NAME}
         )
 
 # pull in common dependencies and additional i2c hardware support
-target_link_libraries(${PROJECT_NAME} pico_ssd1306 pico_stdlib hardware_i2c)
+target_link_libraries(${PROJECT_NAME} pico_ssd1306 pico_stdlib hardware_i2c badger2040 hardware_spi)
 
 target_include_directories(${PROJECT_NAME}
  PUBLIC 
     external
+    external/pimoroni
     external/pico-ssd1306/include
     external/si5351)
 

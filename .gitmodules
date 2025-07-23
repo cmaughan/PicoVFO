@@ -1,1 +1,4 @@
 
+[submodule "external/pimoroni"]
+	path = external/pimoroni
+	url = https://github.com/pimoroni/pimoroni-pico.git
