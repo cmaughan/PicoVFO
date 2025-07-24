@@ -7,8 +7,8 @@
 #include "pico-ssd1306/textRenderer/TextRenderer.h"
 
 #include "hardware/i2c.h"
-
-//##include <badger2040.hpp>
+// #include "pimoroni/libraries/badger2040/badger2040.hpp"
+//  ##include <badger2040.hpp>
 
 // 5351 Frequency Synthesizer library
 extern "C" {
@@ -21,6 +21,8 @@ extern "C" {
 
 // Use the namespace for convenience
 using namespace pico_ssd1306;
+
+// pimoroni::Badger2040 badger;
 
 // Utility function to blind the light for debugging
 void blink()
