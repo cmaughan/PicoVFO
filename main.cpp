@@ -177,6 +177,9 @@ int main()
     auto drawDisplay = [&] {
         // Name of band
         display.clear();
+
+        drawRect(&display, 0, 0, 128, 64);
+
         drawText(&display, font_12x16, "40 Meter", 0, 0);
 
         // Frequency
