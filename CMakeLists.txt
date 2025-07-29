@@ -16,14 +16,14 @@ else()
     set(USERHOME $ENV{HOME})
 endif()
 set(sdkVersion 2.1.1)
-set(toolchainVersion 14_2_Rel1)
+set(toolchainVersion RISCV_RPI_2_0_0_5)
 set(picotoolVersion 2.1.1)
 set(picoVscode ${USERHOME}/.pico-sdk/cmake/pico-vscode.cmake)
 if (EXISTS ${picoVscode})
     include(${picoVscode})
 endif()
 # ====================================================================================
-set(PICO_BOARD pimoroni_tiny2350 CACHE STRING "Board type")
+set(PICO_BOARD pico2 CACHE STRING "Board type")
 
 # Pull in Raspberry Pi Pico SDK (must be before project)
 include(pico_sdk_import.cmake)
@@ -36,7 +36,6 @@ pico_sdk_init()
 # Add executable. Default name is the project name, version 0.1
 
 add_subdirectory(external/pico-ssd1306)
-add_subdirectory(external/pimoroni) 
 
 add_executable(${PROJECT_NAME}
         main.cpp
