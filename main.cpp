@@ -35,8 +35,8 @@ void blink()
 
 // Rotary encoder connections
 #define ENCODER_SWITCH 2
-#define ENCODER_CLK 4 // Pin for A (CLK)
-#define ENCODER_DT 3 // Pin for B (DT)
+#define ENCODER_CLK 1 // Pin for A (CLK)
+#define ENCODER_DT 0 // Pin for B (DT)
 #define ENCODER_ADDRESS 0x3C // The encoder's address on the I2C Bus
 
 std::atomic<int> encoder_count = 0; // Counter for the encoder position
@@ -117,31 +117,36 @@ int main()
     gpio_pull_up(1);
 
     // Rotary encoder
-    gpio_set_function(ENCODER_SWITCH, GPIO_FUNC_SIO);
-    gpio_set_function(ENCODER_CLK, GPIO_FUNC_SIO);
-    gpio_set_function(ENCODER_DT, GPIO_FUNC_SIO);
+//    gpio_set_function(ENCODER_SWITCH, GPIO_FUNC_SIO);
+//    gpio_set_function(ENCODER_CLK, GPIO_FUNC_SIO);
+//    gpio_set_function(ENCODER_DT, GPIO_FUNC_SIO);
 
-    gpio_set_dir(ENCODER_CLK, GPIO_IN);
-    gpio_set_dir(ENCODER_DT, GPIO_IN);
-    gpio_set_dir(ENCODER_SWITCH, GPIO_IN);
+//    gpio_set_dir(ENCODER_CLK, GPIO_IN);
+//    gpio_set_dir(ENCODER_DT, GPIO_IN);
+//    gpio_set_dir(ENCODER_SWITCH, GPIO_IN);
 
-    gpio_pull_up(ENCODER_CLK);
-    gpio_pull_up(ENCODER_DT);
-    gpio_pull_up(ENCODER_SWITCH);
+//    gpio_pull_up(ENCODER_CLK);
+//    gpio_pull_up(ENCODER_DT);
+//    gpio_pull_up(ENCODER_SWITCH);
 
+    /*
     gpio_set_irq_enabled_with_callback(ENCODER_DT, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &encoder_callback);
     gpio_set_irq_enabled(ENCODER_CLK, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true);
-    gpio_set_irq_enabled(ENCODER_SWITCH, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true);
+    */
+    //gpio_set_irq_enabled(ENCODER_SWITCH, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true);
 
     // LED
     gpio_init(PICO_DEFAULT_LED_PIN);
     gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+
+    blink();
 
     // If you don't do anything before initializing a display pi pico is too fast and starts sending
     // commands before the screen controller had time to set itself up, so we add an artificial delay for
     // ssd1306 to set itself up
     sleep_ms(250);
 
+    /*
     // Initialize the Si5351; 7Mhz
     // Calibration to be done later; this is roughly correct
     si5351_init(0x60, SI5351_CRYSTAL_LOAD_8PF, 25000000, -40000); // I am using a 25 MHz TCXO
@@ -158,6 +163,7 @@ int main()
     si5351_output_enable(SI5351_CLK0, 1);
     si5351_output_enable(SI5351_CLK1, 0);
     si5351_output_enable(SI5351_CLK2, 0);
+    */
 
     // Create a new display object at address 0x3C and size of 128x64
     SSD1306 display = SSD1306(i2c0, ENCODER_ADDRESS, Size::W128xH64);
@@ -182,7 +188,7 @@ int main()
 
         drawRect(&display, 0, 0, 127, 63);
 
-        drawText(&display, font_12x16, "40 Meter", 0, 0);
+        drawText(&display, font_12x16, "41 Meter", 0, 0);
 
         // Frequency
         auto str = std::to_string(value) + "Mhz";
@@ -203,7 +209,7 @@ int main()
     {
         // When the encoder ticks, advance
         bool update_clock = false;
-        bool update_display = false;
+        bool update_display = true;
 
         if (abs(encoder_count) > 2)
         {
@@ -231,7 +237,7 @@ int main()
         // Update the clock
         if (update_clock)
         {
-            si5351_set_freq(value * 100ULL, SI5351_CLK0);
+            //si5351_set_freq(value * 100ULL, SI5351_CLK0);
         }
 
         // Update the display
