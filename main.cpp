@@ -7,8 +7,6 @@
 #include "pico-ssd1306/textRenderer/TextRenderer.h"
 
 #include "hardware/i2c.h"
-// #include "pimoroni/libraries/badger2040/badger2040.hpp"
-//  ##include <badger2040.hpp>
 
 // 5351 Frequency Synthesizer library
 extern "C" {
@@ -22,8 +20,6 @@ extern "C" {
 // Use the namespace for convenience
 using namespace pico_ssd1306;
 
-// pimoroni::Badger2040 badger;
-
 // Utility function to blind the light for debugging
 void blink()
 {
@@ -35,13 +31,18 @@ void blink()
 
 // Rotary encoder connections
 #define ENCODER_SWITCH 2
-#define ENCODER_CLK 1 // Pin for A (CLK)
-#define ENCODER_DT 0 // Pin for B (DT)
-#define ENCODER_ADDRESS 0x3C // The encoder's address on the I2C Bus
+#define ENCODER_CLK 3 // Pin for A (CLK)
+#define ENCODER_DT 4 // Pin for B (DT)
+
+#define DISPLAY_CLOCK 1
+#define DISPLAY_DATA 0
+#define DISPLAY_ADDRESS 0x3C // The display's address on the bus
 
 std::atomic<int> encoder_count = 0; // Counter for the encoder position
 std::atomic<bool> button_pressed = false;
 std::atomic<bool> button_state = false;
+    
+std::atomic<uint64_t> value = 7000000;
 
 // Get the encoder state
 uint8_t enc_state(void)
@@ -55,6 +56,8 @@ uint8_t enc_state(void)
 // Handle the encoder switch
 long long int handle_switch(long int a, void* p)
 {
+    value++;
+    button_pressed = true;
     if (gpio_get(ENCODER_SWITCH) == 1 && button_state == false)
     {
         // Trigger button press
@@ -73,11 +76,13 @@ void encoder_callback(uint gpio, uint32_t events)
 {
     if (gpio == ENCODER_SWITCH)
     {
+        value++;
         // Debounce the switch
         add_alarm_in_ms(50, handle_switch, nullptr, true);
     }
     else if (gpio == ENCODER_CLK || gpio == ENCODER_DT)
     {
+        value++;
         // Track the pulses on the encoder and turn into a sensible rotary count.
         static uint8_t saved_enc = 0;
         uint8_t enc_now, enc_prev;
@@ -108,38 +113,42 @@ int main()
     stdio_init_all();
 
     // Init i2c0 controller
-    i2c_init(i2c0, 1000000);
+    i2c_init(i2c0, 48000);
 
     // Set up pins 0 and 1 for I2C, pull both up internally
-    gpio_set_function(0, GPIO_FUNC_I2C);
-    gpio_set_function(1, GPIO_FUNC_I2C);
-    gpio_pull_up(0);
-    gpio_pull_up(1);
+    gpio_set_function(DISPLAY_CLOCK, GPIO_FUNC_I2C);
+    gpio_set_function(DISPLAY_DATA, GPIO_FUNC_I2C);
+    gpio_pull_up(DISPLAY_CLOCK);
+    gpio_pull_up(DISPLAY_DATA);
 
+    gpio_set_dir(DISPLAY_CLOCK, GPIO_IN);
+    gpio_set_dir(DISPLAY_DATA, GPIO_IN);
     // Rotary encoder
-//    gpio_set_function(ENCODER_SWITCH, GPIO_FUNC_SIO);
-//    gpio_set_function(ENCODER_CLK, GPIO_FUNC_SIO);
-//    gpio_set_function(ENCODER_DT, GPIO_FUNC_SIO);
-
-//    gpio_set_dir(ENCODER_CLK, GPIO_IN);
-//    gpio_set_dir(ENCODER_DT, GPIO_IN);
-//    gpio_set_dir(ENCODER_SWITCH, GPIO_IN);
-
-//    gpio_pull_up(ENCODER_CLK);
-//    gpio_pull_up(ENCODER_DT);
-//    gpio_pull_up(ENCODER_SWITCH);
+    //gpio_set_function(ENCODER_SWITCH, GPIO_FUNC_SIO);
+    //gpio_set_function(ENCODER_CLK, GPIO_FUNC_SIO);
+    //gpio_set_function(ENCODER_DT, GPIO_FUNC_SIO);
 
     /*
-    gpio_set_irq_enabled_with_callback(ENCODER_DT, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &encoder_callback);
-    gpio_set_irq_enabled(ENCODER_CLK, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true);
+    gpio_set_dir(ENCODER_CLK, GPIO_IN);
+    gpio_set_dir(ENCODER_DT, GPIO_IN);
+    gpio_set_dir(ENCODER_SWITCH, GPIO_IN);
     */
+
+    /*
+    gpio_pull_up(ENCODER_CLK);
+    gpio_pull_up(ENCODER_DT);
+    gpio_pull_up(ENCODER_SWITCH);
+    */
+
+    //gpio_set_irq_enabled_with_callback(ENCODER_DT, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &encoder_callback);
+    //gpio_set_irq_enabled(ENCODER_CLK, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true);
     //gpio_set_irq_enabled(ENCODER_SWITCH, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true);
 
     // LED
     gpio_init(PICO_DEFAULT_LED_PIN);
     gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
 
-    blink();
+    //blink();
 
     // If you don't do anything before initializing a display pi pico is too fast and starts sending
     // commands before the screen controller had time to set itself up, so we add an artificial delay for
@@ -166,7 +175,7 @@ int main()
     */
 
     // Create a new display object at address 0x3C and size of 128x64
-    SSD1306 display = SSD1306(i2c0, ENCODER_ADDRESS, Size::W128xH64);
+    SSD1306 display = SSD1306(i2c0, DISPLAY_ADDRESS, Size::W128xH64);
 
     // Here we rotate the display by 180 degrees, so that it's not upside down from my perspective
     // If your screen is upside down try setting it to 1 or 0
@@ -179,7 +188,6 @@ int main()
     // Anchor means top left of what we draw
     std::array<int, 2> rows = { 0, 34 };
 
-    uint64_t value = 7000000;
     uint32_t currentDigit = 6;
 
     auto drawDisplay = [&] {
@@ -219,7 +227,7 @@ int main()
             update_clock = true;
             update_display = true;
 
-            value = std::clamp(value, 7000000ull, 7200000ull);
+            value = std::clamp(value.load(), 7000000ull, 7200000ull);
         }
 
         // Encoder button pressed, choose the next unit to change
@@ -237,12 +245,16 @@ int main()
         // Update the clock
         if (update_clock)
         {
-            //si5351_set_freq(value * 100ULL, SI5351_CLK0);
+            // si5351_set_freq(value * 100ULL, SI5351_CLK0);
         }
 
         // Update the display
         if (update_display)
         {
+            if (value.load() < 7000020)
+            {
+                value++;
+            }
             drawDisplay();
         }
 
