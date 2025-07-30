@@ -188,7 +188,17 @@ int main()
 
         // drawRect(&display, 0, 0, 127, 63);
 
-        drawText(&display, font_12x16, "41 metre", x_offset, 2);
+        drawText(&display, font_12x16, "40 metre", x_offset, 2);
+       
+        auto x_bar = 120;
+        auto x_bar_width = 6;
+        auto x_bar_height = 3;
+        auto x_bar_gap = 2;
+
+        for (int i = 0; i < 3; i++)
+        {
+            fillRect(&display, x_bar, ((x_bar_height + x_bar_gap) * i), x_bar + x_bar_width, x_bar_height + ((x_bar_height + x_bar_gap) * i));
+        }
 
         // Frequency
         auto str = std::to_string(frequency) + "Mhz";
