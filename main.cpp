@@ -17,6 +17,8 @@ extern "C" {
 #include <atomic>
 #include <format>
 
+#include "audio.h"
+
 // Use the namespace for convenience
 using namespace pico_ssd1306;
 
@@ -129,8 +131,6 @@ int main()
     gpio_pull_up(ENCODER_DT);
     gpio_pull_up(ENCODER_SWITCH);
 
-    // gpio_set_irq_enabled_with_callback(ENCODER_DT, GPIO_IRQ_EDGE_FALL /*| GPIO_IRQ_EDGE_RISE*/, true, &encoder_callback);
-    // gpio_set_irq_enabled(ENCODER_CLK, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true);
     gpio_set_irq_enabled_with_callback(ENCODER_CLK, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &encoder_callback);
     gpio_set_irq_enabled(ENCODER_DT, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true);
     gpio_set_irq_enabled(ENCODER_SWITCH, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true);
@@ -146,24 +146,23 @@ int main()
     // ssd1306 to set itself up
     sleep_ms(250);
 
-    /*
     // Initialize the Si5351; 7Mhz
     // Calibration to be done later; this is roughly correct
-    si5351_init(0x60, SI5351_CRYSTAL_LOAD_8PF, 25000000, -40000); // I am using a 25 MHz TCXO
+    si5351_init(0x60, SI5351_CRYSTAL_LOAD_8PF, 25000000, 140000); // I am using a 25 MHz TCXO
 
     // Just clock 0 for now
     si5351_set_clock_pwr(SI5351_CLK0, 1); // safety first
     si5351_set_clock_pwr(SI5351_CLK1, 0); // safety first
     si5351_set_clock_pwr(SI5351_CLK2, 0); // safety first
 
-    si5351_drive_strength(SI5351_CLK0, SI5351_DRIVE_8MA);
+    si5351_drive_strength(SI5351_CLK0, SI5351_DRIVE_6MA);
 
     // Start at the base of 40m band
     si5351_set_freq(7000000ULL * 100ULL, SI5351_CLK0);
     si5351_output_enable(SI5351_CLK0, 1);
     si5351_output_enable(SI5351_CLK1, 0);
     si5351_output_enable(SI5351_CLK2, 0);
-    */
+
 
     // Create a new display object at address 0x3C and size of 128x64
     SSD1306 display = SSD1306(i2c0, DISPLAY_ADDRESS, Size::W128xH64);
@@ -171,6 +170,8 @@ int main()
     // Here we rotate the display by 180 degrees, so that it's not upside down from my perspective
     // If your screen is upside down try setting it to 1 or 0
     display.setOrientation(0);
+    display.clear();
+    display.sendBuffer();
 
     // Draw text on display
     // After passing a pointer to display, we need to tell the function what font and text to use
@@ -181,6 +182,11 @@ int main()
 
     uint32_t currentDigit = 6;
     uint32_t x_offset = 4;
+
+    sleep_ms(500);
+
+    // Audio
+    bool audio_ok = vfo_audio::start_audio();
 
     auto drawDisplay = [&] {
         // Name of band
@@ -195,7 +201,7 @@ int main()
         auto x_bar_height = 3;
         auto x_bar_gap = 2;
 
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < (audio_ok ? 3 : 1); i++)
         {
             fillRect(&display, x_bar, ((x_bar_height + x_bar_gap) * i), x_bar + x_bar_width, x_bar_height + ((x_bar_height + x_bar_gap) * i));
         }
@@ -247,7 +253,7 @@ int main()
         // Update the clock
         if (update_clock)
         {
-            // si5351_set_freq(frequency * 100ULL, SI5351_CLK0);
+            si5351_set_freq(frequency * 100ULL, SI5351_CLK0);
         }
 
         // Update the display
@@ -258,6 +264,7 @@ int main()
 
         // Back off, just a bit
         //sleep_ms(1);
+        vfo_audio::update_audio_buffer();
     }
 
     reset_usb_boot(0, 0);

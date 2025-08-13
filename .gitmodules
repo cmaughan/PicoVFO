@@ -2,3 +2,6 @@
 [submodule "external/pimoroni"]
 	path = external/pimoroni
 	url = https://github.com/pimoroni/pimoroni-pico.git
+[submodule "external/pico-extras"]
+	path = external/pico-extras
+	url = https://github.com/raspberrypi/pico-extras.git
