@@ -47,6 +47,9 @@
         "string_view": "cpp",
         "initializer_list": "cpp",
         "span": "cpp",
-        "cstdint": "cpp"
+        "cstdint": "cpp",
+        "chrono": "cpp",
+        "optional": "cpp",
+        "system_error": "cpp"
     }
 }
